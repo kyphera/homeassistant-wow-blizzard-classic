@@ -1,7 +1,7 @@
 """Support for WoW Blizzard API sensors with all features."""
 import asyncio
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List, Optional
 
 from homeassistant.components.sensor import (
@@ -38,6 +38,9 @@ from .const import (
     PVP_SENSOR_TYPES,
     RAID_SENSOR_TYPES,
     MYTHICPLUS_SENSOR_TYPES,
+    EXTENDED_CHARACTER_SENSOR_TYPES,
+    EQUIPMENT_SENSOR_TYPES,
+    EQUIPMENT_SLOTS,
     DEFAULT_SCAN_INTERVAL,
     FAST_SCAN_INTERVAL,
     SLOW_SCAN_INTERVAL,
@@ -74,11 +77,17 @@ class WoWDataUpdateCoordinator(DataUpdateCoordinator):
         )
 
     async def _fetch_basic_character_data(self, realm: str, character_name: str) -> Dict[str, Any]:
-        """Fetch basic character data."""
+        """Fetch basic character data plus extended fields (media, spec, status)."""
         try:
             profile = await self.client.get_character_profile(realm, character_name)
             equipment = await self.client.get_character_equipment(realm, character_name)
             achievements = await self.client.get_character_achievements(realm, character_name)
+            # Extended endpoints — fetched here so all per-character data is in
+            # one place. These all gracefully return {} on 404/403.
+            media = await self.client.get_character_media(realm, character_name)
+            specializations = await self.client.get_character_specializations(realm, character_name)
+            status = await self.client.get_character_status(realm, character_name)
+
             # Item level from character profile response
             item_level = profile.get("equipped_item_level", 0)
 
@@ -89,6 +98,57 @@ class WoWDataUpdateCoordinator(DataUpdateCoordinator):
             guild_name = None
             if profile.get("guild"):
                 guild_name = profile["guild"]["name"]
+
+            # Avatar URL from character-media "assets" array
+            avatar_url = None
+            for asset in (media.get("assets") or []):
+                if asset.get("key") == "avatar":
+                    avatar_url = asset.get("value")
+                    break
+
+            # Convert last_login_timestamp (Unix epoch ms) to a tz-aware
+            # datetime for HA's `timestamp` device_class.
+            last_login_dt = None
+            ll_ts = profile.get("last_login_timestamp")
+            if ll_ts:
+                try:
+                    last_login_dt = datetime.fromtimestamp(ll_ts / 1000, tz=timezone.utc)
+                except (TypeError, ValueError, OSError):
+                    last_login_dt = None
+
+            # Spec name & role. Prefer the specializations endpoint, which has
+            # more detail; fall back to the profile's active_spec when missing.
+            active_spec_name = (
+                (specializations.get("active_specialization") or {}).get("name")
+                or (profile.get("active_spec") or {}).get("name")
+            )
+            spec_role = None
+            spec_role_obj = (specializations.get("active_specialization") or {}).get("role")
+            if isinstance(spec_role_obj, dict):
+                spec_role = spec_role_obj.get("type") or spec_role_obj.get("name")
+            elif isinstance(spec_role_obj, str):
+                spec_role = spec_role_obj
+
+            # Parse equipped items into a per-slot dict keyed by lowercase
+            # slot type (e.g. "head", "main_hand").
+            equipment_slots: Dict[str, Dict[str, Any]] = {}
+            for item in (equipment.get("equipped_items") or []):
+                slot_type = (item.get("slot") or {}).get("type")
+                if not slot_type:
+                    continue
+                item_name = item.get("name")
+                if isinstance(item_name, dict):
+                    item_name = item_name.get("name")
+                level_value = (item.get("level") or {}).get("value")
+                quality = (item.get("quality") or {}).get("name")
+                equipment_slots[slot_type.lower()] = {
+                    "name": item_name,
+                    "item_level": level_value,
+                    "quality": quality,
+                }
+
+            # Status endpoint: is_valid is the main interesting field.
+            is_valid = status.get("is_valid")
 
             return {
                 "character_level": profile.get("level", 0),
@@ -101,7 +161,24 @@ class WoWDataUpdateCoordinator(DataUpdateCoordinator):
                 "realm": profile.get("realm", {}).get("name"),
                 "faction": profile.get("faction", {}).get("name"),
                 "gender": profile.get("gender", {}).get("name"),
-                "spec": profile.get("active_spec", {}).get("name"),
+                "spec": active_spec_name,
+
+                # Extended sensors
+                "character_avatar": avatar_url,
+                "character_id": profile.get("id") or status.get("id"),
+                "character_faction": (profile.get("faction") or {}).get("name"),
+                "character_race_name": (profile.get("race") or {}).get("name"),
+                "character_class_name": (profile.get("character_class") or {}).get("name"),
+                "character_active_spec": active_spec_name,
+                "character_spec_role": spec_role,
+                "character_gender": (profile.get("gender") or {}).get("name"),
+                "character_last_login": last_login_dt,
+                "character_average_item_level": profile.get("average_item_level"),
+                "character_experience": profile.get("experience"),
+                "character_is_valid": is_valid,
+
+                # Equipment per-slot (consumed by WoWEquipmentSlotSensor)
+                "equipment_slots": equipment_slots,
             }
 
         except Exception as err:
@@ -381,7 +458,30 @@ async def async_setup_entry(
             entities.append(
                 WoWCharacterSensor(coordinator, sensor_type, char_key, name, realm)
             )
-        
+
+        # Extended character sensors (avatar, faction, race, spec, etc.) —
+        # available on Retail and Classic. Fields the API does not return
+        # for the selected game version resolve to None / unavailable.
+        name_slug = name.lower()
+        realm_slug = realm.lower().replace(" ", "_").replace("'", "")
+        for sensor_type in EXTENDED_CHARACTER_SENSOR_TYPES:
+            suggested = None
+            if sensor_type == "character_avatar":
+                # Task spec requires sensor.{character}_{realm}_avatar
+                suggested = f"{name_slug}_{realm_slug}_avatar"
+            entities.append(
+                WoWCharacterSensor(
+                    coordinator, sensor_type, char_key, name, realm,
+                    suggested_object_id=suggested,
+                )
+            )
+
+        # Per-slot equipment sensors
+        for slot in EQUIPMENT_SLOTS:
+            entities.append(
+                WoWEquipmentSlotSensor(coordinator, slot, char_key, name, realm)
+            )
+
         # PvP sensors
         if features[CONF_ENABLE_PVP]:
             for sensor_type in PVP_SENSOR_TYPES:
@@ -419,12 +519,13 @@ class WoWCharacterSensor(CoordinatorEntity, SensorEntity):
     """Representation of a WoW character sensor."""
 
     def __init__(
-        self, 
+        self,
         coordinator: WoWDataUpdateCoordinator,
         sensor_type: str,
         char_key: str,
         character_name: str,
-        realm: str
+        realm: str,
+        suggested_object_id: Optional[str] = None,
     ):
         """Initialize the sensor."""
         super().__init__(coordinator)
@@ -432,14 +533,16 @@ class WoWCharacterSensor(CoordinatorEntity, SensorEntity):
         self._char_key = char_key
         self._character_name = character_name
         self._realm = realm
-        
+
         sensor_config = ALL_SENSOR_TYPES[sensor_type]
-        
+
         self._attr_name = f"{character_name} {sensor_config['name']}"
         self._attr_unique_id = f"{DOMAIN}_{realm}_{character_name}_{sensor_type}"
         self._attr_icon = sensor_config["icon"]
         self._attr_native_unit_of_measurement = sensor_config.get("unit")
         self._attr_device_class = sensor_config.get("device_class")
+        if suggested_object_id:
+            self._attr_suggested_object_id = suggested_object_id
 
     @property
     def native_value(self):
@@ -478,6 +581,8 @@ class WoWCharacterSensor(CoordinatorEntity, SensorEntity):
             attributes["category"] = "raid"
         elif self._sensor_type in MYTHICPLUS_SENSOR_TYPES:
             attributes["category"] = "mythic_plus"
+        elif self._sensor_type in EXTENDED_CHARACTER_SENSOR_TYPES:
+            attributes["category"] = "character_extended"
         else:
             attributes["category"] = "character"
             
@@ -553,4 +658,79 @@ class WoWServerSensor(CoordinatorEntity, SensorEntity):
             "manufacturer": "Blizzard Entertainment",
             "model": "World of Warcraft Realm",
             "sw_version": "The War Within",
+        }
+
+
+class WoWEquipmentSlotSensor(CoordinatorEntity, SensorEntity):
+    """Representation of a single equipment slot on a character.
+
+    State is the equipped item's name; the item level is exposed as an
+    ``item_level`` attribute. Empty slots resolve to ``None`` (unavailable).
+    """
+
+    def __init__(
+        self,
+        coordinator: WoWDataUpdateCoordinator,
+        slot: str,
+        char_key: str,
+        character_name: str,
+        realm: str,
+    ):
+        super().__init__(coordinator)
+        self._slot = slot  # canonical uppercase, e.g. "HEAD"
+        self._slot_key = slot.lower()
+        self._char_key = char_key
+        self._character_name = character_name
+        self._realm = realm
+
+        slot_label = slot.replace("_", " ").title()
+        self._attr_name = f"{character_name} {slot_label} Slot"
+        self._attr_unique_id = f"{DOMAIN}_{realm}_{character_name}_slot_{self._slot_key}"
+        self._attr_icon = "mdi:tshirt-crew"
+
+        # Task spec: sensor.{character}_{realm}_slot_{slot_lowercase}
+        name_slug = character_name.lower()
+        realm_slug = realm.lower().replace(" ", "_").replace("'", "")
+        self._attr_suggested_object_id = f"{name_slug}_{realm_slug}_slot_{self._slot_key}"
+
+    def _slot_data(self) -> Dict[str, Any]:
+        if not self.coordinator.data or self._char_key not in self.coordinator.data:
+            return {}
+        slots = (self.coordinator.data[self._char_key] or {}).get("equipment_slots") or {}
+        return slots.get(self._slot_key) or {}
+
+    @property
+    def native_value(self):
+        """Return the equipped item's name, or None if the slot is empty."""
+        item = self._slot_data()
+        name = item.get("name")
+        return name if name else None
+
+    @property
+    def available(self) -> bool:
+        """Mark unavailable if the slot is empty or coordinator has no data."""
+        return bool(self.native_value)
+
+    @property
+    def extra_state_attributes(self):
+        item = self._slot_data()
+        char_data = (self.coordinator.data or {}).get(self._char_key) or {}
+        return {
+            "slot": self._slot,
+            "item_level": item.get("item_level"),
+            "quality": item.get("quality"),
+            "character_name": self._character_name,
+            "realm": self._realm,
+            "character_class": char_data.get("character_class"),
+            "category": "equipment",
+            "last_update": self.coordinator.last_update_success,
+        }
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, f"{self._realm}_{self._character_name}")},
+            "name": f"{self._character_name} ({self._realm})",
+            "manufacturer": "Blizzard Entertainment",
+            "model": "World of Warcraft Character",
         }

@@ -188,6 +188,27 @@ class WoWBlizzardAPIClient:
         realm_slug = self.realm_to_slug(realm)
         return {}
 
+    async def get_character_media(self, realm: str, character_name: str) -> Dict[str, Any]:
+        """Get character media (avatar, inset, main image)."""
+        realm_slug = self.realm_to_slug(realm)
+        endpoint = f"/profile/wow/character/{realm_slug}/{character_name.lower()}/character-media"
+        params = {"namespace": self._get_namespace("profile")}
+        return await self._make_request(endpoint, params)
+
+    async def get_character_specializations(self, realm: str, character_name: str) -> Dict[str, Any]:
+        """Get character specializations (active spec, talents, glyphs)."""
+        realm_slug = self.realm_to_slug(realm)
+        endpoint = f"/profile/wow/character/{realm_slug}/{character_name.lower()}/specializations"
+        params = {"namespace": self._get_namespace("profile")}
+        return await self._make_request(endpoint, params)
+
+    async def get_character_status(self, realm: str, character_name: str) -> Dict[str, Any]:
+        """Get character status (is_valid, id)."""
+        realm_slug = self.realm_to_slug(realm)
+        endpoint = f"/profile/wow/character/{realm_slug}/{character_name.lower()}/status"
+        params = {"namespace": self._get_namespace("profile")}
+        return await self._make_request(endpoint, params)
+
     # === Realm/Server Methods ===
     
     async def get_realm_info(self, realm: str) -> Dict[str, Any]:

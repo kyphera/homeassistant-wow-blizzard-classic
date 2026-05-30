@@ -239,6 +239,103 @@ MYTHICPLUS_SENSOR_TYPES = {
     },
 }
 
+# Extended character data exposed as sensors (from profile/media/spec/status
+# endpoints). These are available on Classic as well as Retail; fields the
+# Classic API does not return will simply resolve to None.
+EXTENDED_CHARACTER_SENSOR_TYPES = {
+    "character_avatar": {
+        "name": "Avatar",
+        "icon": "mdi:account-circle",
+        "unit": None,
+        "device_class": None,
+    },
+    "character_id": {
+        "name": "Character ID",
+        "icon": "mdi:identifier",
+        "unit": None,
+        "device_class": None,
+    },
+    "character_faction": {
+        "name": "Faction",
+        "icon": "mdi:flag",
+        "unit": None,
+        "device_class": None,
+    },
+    "character_race_name": {
+        "name": "Race",
+        "icon": "mdi:account",
+        "unit": None,
+        "device_class": None,
+    },
+    "character_class_name": {
+        "name": "Class",
+        "icon": "mdi:sword-cross",
+        "unit": None,
+        "device_class": None,
+    },
+    "character_active_spec": {
+        "name": "Active Specialization",
+        "icon": "mdi:star-circle",
+        "unit": None,
+        "device_class": None,
+    },
+    "character_spec_role": {
+        "name": "Spec Role",
+        "icon": "mdi:account-tie",
+        "unit": None,
+        "device_class": None,
+    },
+    "character_gender": {
+        "name": "Gender",
+        "icon": "mdi:human-male-female",
+        "unit": None,
+        "device_class": None,
+    },
+    "character_last_login": {
+        "name": "Last Login",
+        "icon": "mdi:login",
+        "unit": None,
+        "device_class": "timestamp",
+    },
+    "character_average_item_level": {
+        "name": "Average Item Level",
+        "icon": "mdi:sword",
+        "unit": "ilvl",
+        "device_class": None,
+    },
+    "character_experience": {
+        "name": "Experience",
+        "icon": "mdi:chart-line",
+        "unit": "xp",
+        "device_class": None,
+    },
+    "character_is_valid": {
+        "name": "Is Valid",
+        "icon": "mdi:check-circle",
+        "unit": None,
+        "device_class": None,
+    },
+}
+
+# Equipment slot identifiers (Blizzard API slot.type values) we expose as
+# per-slot sensors. State = item name, attribute item_level = the item's level.
+EQUIPMENT_SLOTS = [
+    "HEAD", "NECK", "SHOULDER", "BACK", "CHEST", "WRIST",
+    "HANDS", "WAIST", "LEGS", "FEET",
+    "FINGER_1", "FINGER_2", "TRINKET_1", "TRINKET_2",
+    "MAIN_HAND", "OFF_HAND",
+]
+
+EQUIPMENT_SENSOR_TYPES = {
+    f"equipment_{slot.lower()}": {
+        "name": f"{slot.replace('_', ' ').title()} Slot",
+        "icon": "mdi:tshirt-crew",
+        "unit": None,
+        "device_class": None,
+    }
+    for slot in EQUIPMENT_SLOTS
+}
+
 # Combine all sensor types
 ALL_SENSOR_TYPES = {
     **BASIC_SENSOR_TYPES,
@@ -246,6 +343,8 @@ ALL_SENSOR_TYPES = {
     **PVP_SENSOR_TYPES,
     **RAID_SENSOR_TYPES,
     **MYTHICPLUS_SENSOR_TYPES,
+    **EXTENDED_CHARACTER_SENSOR_TYPES,
+    **EQUIPMENT_SENSOR_TYPES,
 }
 
 # Current raid tiers (update when new raids release)
