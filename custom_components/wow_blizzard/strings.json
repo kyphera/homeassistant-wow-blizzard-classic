@@ -7,7 +7,11 @@
         "data": {
           "client_id": "Client ID",
           "client_secret": "Client Secret",
-          "region": "Region"
+          "region": "Region",
+          "game_version": "Game Version"
+        },
+        "data_description": {
+          "game_version": "Choose Retail for modern WoW, or a Classic option for Classic Era, TBC/Wrath/Cata progression, or Anniversary Classic realms. Mythic+ and modern raid progress are unavailable on Classic."
         }
       },
       "features": {
@@ -33,6 +37,16 @@
         "description": "Added {character_name} (Level {character_level} {character_class} {character_race}) from {realm}. Total characters: {total_characters}. Would you like to add another character?",
         "data": {
           "add_another": "Add Another Character"
+        }
+      }
+    },
+    "selector": {
+      "game_version": {
+        "options": {
+          "retail": "Retail (Modern)",
+          "classic_era": "Classic Era (Vanilla)",
+          "classic_tbc": "Classic Progression (TBC/Wrath/Cata)",
+          "classic_ann": "Anniversary Classic"
         }
       }
     },

@@ -26,10 +26,12 @@ from .const import (
     CONF_CLIENT_SECRET,
     CONF_REGION,
     CONF_CHARACTERS,
+    CONF_GAME_VERSION,
     CONF_ENABLE_SERVER_STATUS,
     CONF_ENABLE_PVP,
     CONF_ENABLE_RAIDS,
     CONF_ENABLE_MYTHIC_PLUS,
+    GAME_VERSION_RETAIL,
     ALL_SENSOR_TYPES,
     BASIC_SENSOR_TYPES,
     SERVER_SENSOR_TYPES,
@@ -341,21 +343,25 @@ async def async_setup_entry(
     client_id = entry.data[CONF_CLIENT_ID]
     client_secret = entry.data[CONF_CLIENT_SECRET]
     region = entry.data[CONF_REGION]
+    game_version = entry.data.get(CONF_GAME_VERSION, GAME_VERSION_RETAIL)
     characters = entry.data.get(CONF_CHARACTERS, [])
-    
-    # Feature flags
+
+    is_retail = game_version == GAME_VERSION_RETAIL
+
+    # Feature flags. Classic does not expose Mythic+ or modern raid
+    # progress endpoints, so force those off regardless of saved preference.
     features = {
         CONF_ENABLE_SERVER_STATUS: entry.data.get(CONF_ENABLE_SERVER_STATUS, True),
         CONF_ENABLE_PVP: entry.data.get(CONF_ENABLE_PVP, True),
-        CONF_ENABLE_RAIDS: entry.data.get(CONF_ENABLE_RAIDS, True),
-        CONF_ENABLE_MYTHIC_PLUS: entry.data.get(CONF_ENABLE_MYTHIC_PLUS, True),
+        CONF_ENABLE_RAIDS: entry.data.get(CONF_ENABLE_RAIDS, True) and is_retail,
+        CONF_ENABLE_MYTHIC_PLUS: entry.data.get(CONF_ENABLE_MYTHIC_PLUS, True) and is_retail,
     }
 
     if not characters:
         _LOGGER.error("No characters configured")
         return
 
-    client = WoWBlizzardAPIClient(client_id, client_secret, region)
+    client = WoWBlizzardAPIClient(client_id, client_secret, region, game_version=game_version)
     coordinator = WoWDataUpdateCoordinator(hass, client, characters, features)
 
     # Fetch initial data

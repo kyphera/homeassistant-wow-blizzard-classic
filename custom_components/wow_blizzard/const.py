@@ -9,10 +9,49 @@ CONF_REGION = "region"
 CONF_REALM = "realm"
 CONF_CHARACTER_NAME = "character_name"
 CONF_CHARACTERS = "characters"
+CONF_GAME_VERSION = "game_version"
 CONF_ENABLE_SERVER_STATUS = "enable_server_status"
 CONF_ENABLE_PVP = "enable_pvp"
 CONF_ENABLE_RAIDS = "enable_raids"
 CONF_ENABLE_MYTHIC_PLUS = "enable_mythic_plus"
+
+# Game versions
+GAME_VERSION_RETAIL = "retail"
+GAME_VERSION_CLASSIC_ERA = "classic_era"
+GAME_VERSION_CLASSIC_TBC = "classic_tbc"
+GAME_VERSION_CLASSIC_ANN = "classic_ann"
+
+# Namespace prefix per game version. Combined with the region at runtime
+# (e.g. "dynamic-classic-us") for the Blizzard API `namespace` query param.
+NAMESPACE_PREFIXES = {
+    GAME_VERSION_RETAIL: {
+        "static": "static",
+        "dynamic": "dynamic",
+        "profile": "profile",
+    },
+    GAME_VERSION_CLASSIC_ERA: {
+        "static": "static-classic1x",
+        "dynamic": "dynamic-classic1x",
+        "profile": "profile-classic1x",
+    },
+    GAME_VERSION_CLASSIC_TBC: {
+        "static": "static-classic",
+        "dynamic": "dynamic-classic",
+        "profile": "profile-classic",
+    },
+    GAME_VERSION_CLASSIC_ANN: {
+        "static": "static-classicann",
+        "dynamic": "dynamic-classicann",
+        "profile": "profile-classicann",
+    },
+}
+
+GAME_VERSION_LABELS = {
+    GAME_VERSION_RETAIL: "Retail (Modern)",
+    GAME_VERSION_CLASSIC_ERA: "Classic Era (Vanilla)",
+    GAME_VERSION_CLASSIC_TBC: "Classic Progression (TBC/Wrath/Cata)",
+    GAME_VERSION_CLASSIC_ANN: "Anniversary Classic",
+}
 
 # API URLs
 API_URLS = {

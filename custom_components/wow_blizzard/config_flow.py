@@ -19,11 +19,17 @@ from .const import (
     CONF_REALM,
     CONF_CHARACTER_NAME,
     CONF_CHARACTERS,
+    CONF_GAME_VERSION,
     CONF_ENABLE_SERVER_STATUS,
     CONF_ENABLE_PVP,
     CONF_ENABLE_RAIDS,
     CONF_ENABLE_MYTHIC_PLUS,
     DEFAULT_REGION,
+    GAME_VERSION_RETAIL,
+    GAME_VERSION_CLASSIC_ERA,
+    GAME_VERSION_CLASSIC_TBC,
+    GAME_VERSION_CLASSIC_ANN,
+    GAME_VERSION_LABELS,
 )
 from .api_client import WoWBlizzardAPIClient
 
@@ -41,6 +47,17 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
                     {"value": "kr", "label": "Korea (KR)"},
                     {"value": "tw", "label": "Taiwan (TW)"},
                     {"value": "cn", "label": "China (CN)"},
+                ],
+                mode=selector.SelectSelectorMode.DROPDOWN,
+            )
+        ),
+        vol.Required(CONF_GAME_VERSION, default=GAME_VERSION_RETAIL): selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=[
+                    {"value": GAME_VERSION_RETAIL, "label": GAME_VERSION_LABELS[GAME_VERSION_RETAIL]},
+                    {"value": GAME_VERSION_CLASSIC_ERA, "label": GAME_VERSION_LABELS[GAME_VERSION_CLASSIC_ERA]},
+                    {"value": GAME_VERSION_CLASSIC_TBC, "label": GAME_VERSION_LABELS[GAME_VERSION_CLASSIC_TBC]},
+                    {"value": GAME_VERSION_CLASSIC_ANN, "label": GAME_VERSION_LABELS[GAME_VERSION_CLASSIC_ANN]},
                 ],
                 mode=selector.SelectSelectorMode.DROPDOWN,
             )
@@ -109,9 +126,10 @@ def create_realm_selector_config(realm_options: List[Dict[str, str]]) -> selecto
 async def validate_api_credentials(hass: HomeAssistant, data: dict[str, any]) -> dict[str, any]:
     """Validate the API credentials by making a test call."""
     client = WoWBlizzardAPIClient(
-        data[CONF_CLIENT_ID], 
-        data[CONF_CLIENT_SECRET], 
-        data[CONF_REGION]
+        data[CONF_CLIENT_ID],
+        data[CONF_CLIENT_SECRET],
+        data[CONF_REGION],
+        game_version=data.get(CONF_GAME_VERSION, GAME_VERSION_RETAIL),
     )
 
     try:
@@ -138,9 +156,10 @@ async def validate_api_credentials(hass: HomeAssistant, data: dict[str, any]) ->
 async def validate_character(hass: HomeAssistant, data: dict[str, any], character: dict[str, str]) -> dict[str, any]:
     """Validate that a character exists."""
     client = WoWBlizzardAPIClient(
-        data[CONF_CLIENT_ID], 
-        data[CONF_CLIENT_SECRET], 
-        data[CONF_REGION]
+        data[CONF_CLIENT_ID],
+        data[CONF_CLIENT_SECRET],
+        data[CONF_REGION],
+        game_version=data.get(CONF_GAME_VERSION, GAME_VERSION_RETAIL),
     )
 
     try:
