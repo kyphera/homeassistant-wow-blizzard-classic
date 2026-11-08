@@ -46,7 +46,8 @@
           "retail": "Retail (Modern)",
           "classic_era": "Classic Era (Vanilla)",
           "classic_tbc": "Classic Progression (TBC/Wrath/Cata)",
-          "classic_ann": "Anniversary Classic"
+          "classic_ann": "Anniversary Classic",
+          "forever": "WoW: Forever"
         }
       }
     },
@@ -146,6 +147,24 @@
       },
       "mythicplus_weekly_best": {
         "name": "Weekly Best M+"
+      },
+      "character_active_title": {
+        "name": "Active Title"
+      },
+      "character_primary_profession_1": {
+        "name": "Primary Profession 1"
+      },
+      "character_primary_profession_2": {
+        "name": "Primary Profession 2"
+      },
+      "character_cooking": {
+        "name": "Cooking"
+      },
+      "character_fishing": {
+        "name": "Fishing"
+      },
+      "character_first_aid": {
+        "name": "First Aid"
       }
     }
   }

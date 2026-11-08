@@ -20,6 +20,7 @@ GAME_VERSION_RETAIL = "retail"
 GAME_VERSION_CLASSIC_ERA = "classic_era"
 GAME_VERSION_CLASSIC_TBC = "classic_tbc"
 GAME_VERSION_CLASSIC_ANN = "classic_ann"
+GAME_VERSION_FOREVER = "forever"
 
 # Namespace prefix per game version. Combined with the region at runtime
 # (e.g. "dynamic-classic-us") for the Blizzard API `namespace` query param.
@@ -44,6 +45,15 @@ NAMESPACE_PREFIXES = {
         "dynamic": "dynamic-classicann",
         "profile": "profile-classicann",
     },
+    # WoW: Forever (launched 2026-11-04). Supported in US/EU/KR/TW; CN has its
+    # own API host. Forever has no realms — rulesets replace them — so the
+    # realm index / realm-info calls return 404 and server-status sensors
+    # will show "Unknown". Character slug path still accepts the ruleset name.
+    GAME_VERSION_FOREVER: {
+        "static": "static-forever",
+        "dynamic": "dynamic-forever",
+        "profile": "profile-forever",
+    },
 }
 
 GAME_VERSION_LABELS = {
@@ -51,6 +61,7 @@ GAME_VERSION_LABELS = {
     GAME_VERSION_CLASSIC_ERA: "Classic Era (Vanilla)",
     GAME_VERSION_CLASSIC_TBC: "Classic Progression (TBC/Wrath/Cata)",
     GAME_VERSION_CLASSIC_ANN: "Anniversary Classic",
+    GAME_VERSION_FOREVER: "WoW: Forever",
 }
 
 # API URLs
@@ -313,6 +324,42 @@ EXTENDED_CHARACTER_SENSOR_TYPES = {
         "name": "Is Valid",
         "icon": "mdi:check-circle",
         "unit": None,
+        "device_class": None,
+    },
+    "character_active_title": {
+        "name": "Active Title",
+        "icon": "mdi:crown",
+        "unit": None,
+        "device_class": None,
+    },
+    "character_primary_profession_1": {
+        "name": "Primary Profession 1",
+        "icon": "mdi:hammer-wrench",
+        "unit": None,
+        "device_class": None,
+    },
+    "character_primary_profession_2": {
+        "name": "Primary Profession 2",
+        "icon": "mdi:hammer-wrench",
+        "unit": None,
+        "device_class": None,
+    },
+    "character_cooking": {
+        "name": "Cooking",
+        "icon": "mdi:pot-steam",
+        "unit": "skill",
+        "device_class": None,
+    },
+    "character_fishing": {
+        "name": "Fishing",
+        "icon": "mdi:fish",
+        "unit": "skill",
+        "device_class": None,
+    },
+    "character_first_aid": {
+        "name": "First Aid",
+        "icon": "mdi:bandage",
+        "unit": "skill",
         "device_class": None,
     },
 }

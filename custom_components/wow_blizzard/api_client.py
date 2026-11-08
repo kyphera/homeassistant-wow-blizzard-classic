@@ -209,6 +209,20 @@ class WoWBlizzardAPIClient:
         params = {"namespace": self._get_namespace("profile")}
         return await self._make_request(endpoint, params)
 
+    async def get_character_titles(self, realm: str, character_name: str) -> Dict[str, Any]:
+        """Get character titles (active_title, available titles)."""
+        realm_slug = self.realm_to_slug(realm)
+        endpoint = f"/profile/wow/character/{realm_slug}/{character_name.lower()}/titles"
+        params = {"namespace": self._get_namespace("profile")}
+        return await self._make_request(endpoint, params)
+
+    async def get_character_professions(self, realm: str, character_name: str) -> Dict[str, Any]:
+        """Get character professions (primaries + secondaries with skill tiers)."""
+        realm_slug = self.realm_to_slug(realm)
+        endpoint = f"/profile/wow/character/{realm_slug}/{character_name.lower()}/professions"
+        params = {"namespace": self._get_namespace("profile")}
+        return await self._make_request(endpoint, params)
+
     # === Realm/Server Methods ===
     
     async def get_realm_info(self, realm: str) -> Dict[str, Any]:

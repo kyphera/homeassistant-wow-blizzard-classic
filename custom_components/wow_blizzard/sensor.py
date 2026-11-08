@@ -87,6 +87,8 @@ class WoWDataUpdateCoordinator(DataUpdateCoordinator):
             media = await self.client.get_character_media(realm, character_name)
             specializations = await self.client.get_character_specializations(realm, character_name)
             status = await self.client.get_character_status(realm, character_name)
+            titles = await self.client.get_character_titles(realm, character_name)
+            professions = await self.client.get_character_professions(realm, character_name)
 
             # Item level from character profile response
             item_level = profile.get("equipped_item_level", 0)
@@ -150,6 +152,54 @@ class WoWDataUpdateCoordinator(DataUpdateCoordinator):
             # Status endpoint: is_valid is the main interesting field.
             is_valid = status.get("is_valid")
 
+            # Active title. The titles endpoint returns:
+            #   {"active_title": {"id": X, "name": "Display %s string",
+            #                     "display_string": "Hero %s" }, "titles": [...]}
+            # Prefer `display_string` when present (it already has %s replaced
+            # on the server side for some responses); otherwise fall back to
+            # `name`. Many Classic characters simply have no active title.
+            active_title = None
+            at = titles.get("active_title") if isinstance(titles, dict) else None
+            if isinstance(at, dict):
+                active_title = at.get("display_string") or at.get("name")
+
+            # Professions. Response:
+            #   {"primaries": [{"profession": {"name": ...}, "tiers": [...]}],
+            #    "secondaries": [...]}
+            # Each tier has skill_points, max_skill_points, tier.name. Take the
+            # highest-value tier (usually there's just one on Classic).
+            def _prof_best_tier(p: Dict[str, Any]) -> Dict[str, Any]:
+                tiers = p.get("tiers") or []
+                if not tiers:
+                    return {}
+                return max(tiers, key=lambda t: t.get("skill_points") or 0)
+
+            def _prof_name(p: Dict[str, Any]) -> Optional[str]:
+                prof = p.get("profession") or {}
+                return prof.get("name")
+
+            primaries = (professions.get("primaries") or []) if isinstance(professions, dict) else []
+            secondaries = (professions.get("secondaries") or []) if isinstance(professions, dict) else []
+
+            primary1_name = _prof_name(primaries[0]) if len(primaries) > 0 else None
+            primary1_tier = _prof_best_tier(primaries[0]) if len(primaries) > 0 else {}
+            primary2_name = _prof_name(primaries[1]) if len(primaries) > 1 else None
+            primary2_tier = _prof_best_tier(primaries[1]) if len(primaries) > 1 else {}
+
+            # Secondary professions on Classic: cooking, fishing, first aid.
+            # Match by canonical English name (API returns localized names
+            # when locale is set; we pass en_US / region default, so this is
+            # reliable in practice).
+            secondary_by_name: Dict[str, Dict[str, Any]] = {}
+            for s in secondaries:
+                n = (_prof_name(s) or "").strip().lower()
+                if n:
+                    secondary_by_name[n] = _prof_best_tier(s)
+
+            cooking_skill = (secondary_by_name.get("cooking") or {}).get("skill_points")
+            fishing_skill = (secondary_by_name.get("fishing") or {}).get("skill_points")
+            first_aid_skill = (secondary_by_name.get("first aid") or {}).get("skill_points")
+
             return {
                 "character_level": profile.get("level", 0),
                 "character_item_level": item_level,
@@ -176,6 +226,19 @@ class WoWDataUpdateCoordinator(DataUpdateCoordinator):
                 "character_average_item_level": profile.get("average_item_level"),
                 "character_experience": profile.get("experience"),
                 "character_is_valid": is_valid,
+                "character_active_title": active_title,
+                "character_primary_profession_1": primary1_name,
+                "character_primary_profession_2": primary2_name,
+                "character_cooking": cooking_skill,
+                "character_fishing": fishing_skill,
+                "character_first_aid": first_aid_skill,
+
+                # Profession skill details (surfaced via sensor attributes)
+                "_prof_primary_1_tier": primary1_tier,
+                "_prof_primary_2_tier": primary2_tier,
+                "_prof_cooking_tier": secondary_by_name.get("cooking") or {},
+                "_prof_fishing_tier": secondary_by_name.get("fishing") or {},
+                "_prof_first_aid_tier": secondary_by_name.get("first aid") or {},
 
                 # Equipment per-slot (consumed by WoWEquipmentSlotSensor)
                 "equipment_slots": equipment_slots,
@@ -585,6 +648,21 @@ class WoWCharacterSensor(CoordinatorEntity, SensorEntity):
             attributes["category"] = "character_extended"
         else:
             attributes["category"] = "character"
+
+        # Attach profession-skill detail when this sensor represents one.
+        prof_tier_key = {
+            "character_primary_profession_1": "_prof_primary_1_tier",
+            "character_primary_profession_2": "_prof_primary_2_tier",
+            "character_cooking": "_prof_cooking_tier",
+            "character_fishing": "_prof_fishing_tier",
+            "character_first_aid": "_prof_first_aid_tier",
+        }.get(self._sensor_type)
+        if prof_tier_key:
+            tier = (char_data.get(prof_tier_key) or {})
+            attributes["skill_points"] = tier.get("skill_points")
+            attributes["max_skill_points"] = tier.get("max_skill_points")
+            tier_obj = tier.get("tier") or {}
+            attributes["tier_name"] = tier_obj.get("name")
             
         return attributes
 

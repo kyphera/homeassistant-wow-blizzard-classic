@@ -29,6 +29,7 @@ from .const import (
     GAME_VERSION_CLASSIC_ERA,
     GAME_VERSION_CLASSIC_TBC,
     GAME_VERSION_CLASSIC_ANN,
+    GAME_VERSION_FOREVER,
     GAME_VERSION_LABELS,
 )
 from .api_client import WoWBlizzardAPIClient
@@ -58,6 +59,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
                     {"value": GAME_VERSION_CLASSIC_ERA, "label": GAME_VERSION_LABELS[GAME_VERSION_CLASSIC_ERA]},
                     {"value": GAME_VERSION_CLASSIC_TBC, "label": GAME_VERSION_LABELS[GAME_VERSION_CLASSIC_TBC]},
                     {"value": GAME_VERSION_CLASSIC_ANN, "label": GAME_VERSION_LABELS[GAME_VERSION_CLASSIC_ANN]},
+                    {"value": GAME_VERSION_FOREVER, "label": GAME_VERSION_LABELS[GAME_VERSION_FOREVER]},
                 ],
                 mode=selector.SelectSelectorMode.DROPDOWN,
             )
@@ -132,18 +134,27 @@ async def validate_api_credentials(hass: HomeAssistant, data: dict[str, any]) ->
         game_version=data.get(CONF_GAME_VERSION, GAME_VERSION_RETAIL),
     )
 
+    game_version = data.get(CONF_GAME_VERSION, GAME_VERSION_RETAIL)
+    forever = game_version == GAME_VERSION_FOREVER
+
     try:
-        # Get ALL realms (no limit!)
+        # Get ALL realms (no limit!). Forever has no realms (rulesets replace
+        # them), so we skip this call and let the character step fall back to
+        # free-text input for the ruleset slug.
+        if forever:
+            _LOGGER.info("WoW: Forever selected — skipping realm index (rulesets replace realms)")
+            return {"realms": []}
+
         realms = await client.get_all_realms()
-        
+
         if not realms or "realms" not in realms:
             raise CannotConnect("Unable to fetch realms - API credentials may be invalid")
-        
+
         # Sort realms alphabetically for better UX
         sorted_realms = sorted(realms.get("realms", []), key=lambda x: x.get("name", ""))
-        
+
         _LOGGER.info(f"Loaded {len(sorted_realms)} realms for region {data[CONF_REGION]}")
-        
+
         return {"realms": sorted_realms}
         
     except Exception as e:
